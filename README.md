@@ -2,7 +2,7 @@
 
 Newer dgVoodoo2 versions secretly check for Wine and, if found, corrupt graphics pointers so games crash ([WineHQ bug 58731](https://bugs.winehq.org/show_bug.cgi?id=58731)). This script turns that check off. Your original files are not changed.
 
-Works with **dgVoodoo 2.87.5** only.
+Tested with **dgVoodoo 2.87.5**. On any other version it warns you and asks whether to continue. It may still work on other versions, but test the result.
 
 ## How to use
 

@@ -16,7 +16,8 @@ therefore unpacked (larger, same behaviour).
 
 Usage:
   python3 patch_dgvoodoo.py                      # patch the folder this script is in
-  python3 patch_dgvoodoo.py <dgVoodoo dir> [<output dir>] [--upx /path/to/upx]
+  python3 patch_dgvoodoo.py <dgVoodoo dir> [<output dir>] [--upx /path/to/upx] [--yes]
+Versions other than 2.87.5 ask for confirmation first (--yes skips the question).
 Your original files are never modified; results go to <dgVoodoo dir>/patched.
 """
 import argparse, hashlib, os, shutil, struct, subprocess, sys, tempfile
@@ -80,6 +81,41 @@ def patch(d):
         i = d.find(A64_POOL, i + 1)
     return done
 
+TESTED_VERSIONS = {'2.8.7.5'}   # dgVoodooCpl.exe FileVersion of releases this was verified on
+
+def dgvoodoo_version(src):
+    """FileVersion of dgVoodooCpl.exe (from its VS_FIXEDFILEINFO), or None."""
+    for rel in ('dgVoodooCpl.exe', os.path.join('Cpl', 'x64', 'dgVoodooCpl.exe'),
+                os.path.join('Cpl', 'arm64', 'dgVoodooCpl.exe')):
+        p = os.path.join(src, rel)
+        if not os.path.exists(p): continue
+        d = open(p, 'rb').read()
+        i = d.find(b'\xbd\x04\xef\xfe')            # VS_FIXEDFILEINFO signature
+        if i < 0: continue
+        ms, ls = struct.unpack_from('<II', d, i + 8)
+        return f'{ms >> 16}.{ms & 0xffff}.{ls >> 16}.{ls & 0xffff}'
+    return None
+
+def confirm_version(src, assume_yes):
+    v = dgvoodoo_version(src)
+    if v in TESTED_VERSIONS:
+        print(f'dgVoodoo version {v} (tested).\n')
+        return True
+    print('WARNING: ' + (f'dgVoodoo version {v} has not been tested with this patcher.' if v
+                         else 'Could not determine the dgVoodoo version (dgVoodooCpl.exe not found).'))
+    print('The patch looks for the exact code pattern found in 2.87.5. On other versions it may\n'
+          'find nothing, or (unlikely) change the wrong byte. Your originals are not modified\n'
+          'either way, but test the patched DLLs before relying on them.')
+    if assume_yes:
+        print('Continuing because --yes was given.\n')
+        return True
+    try:
+        ans = input('Continue anyway? [y/N] ')
+    except EOFError:
+        ans = ''
+    print()
+    return ans.strip().lower() in ('y', 'yes')
+
 UPX_VER = '4.2.4'
 UPX_DL = {  # official upx/upx GitHub release, pinned by SHA-256
     'win32': ('upx-4.2.4-win64.zip', 'upx.exe',
@@ -119,6 +155,7 @@ def main():
     ap.add_argument('src', nargs='?', help='dgVoodoo folder (default: folder this script is in)')
     ap.add_argument('out', nargs='?', help='output folder (default: <src>/patched)')
     ap.add_argument('--upx', help='path to upx (default: find or download it)')
+    ap.add_argument('--yes', action='store_true', help='do not ask for confirmation on untested versions')
     a = ap.parse_args()
     interactive = a.src is None
     a.src = os.path.abspath(a.src or here)
@@ -132,6 +169,9 @@ def main():
             input('\nPress Enter to close...')
 
 def run(a, here):
+    if not confirm_version(a.src, a.yes):
+        print('Cancelled. Nothing was changed.')
+        return
     a.upx = a.upx or find_upx(here)
     total = 0; problems = 0
     for root, dirs, files in os.walk(a.src):
