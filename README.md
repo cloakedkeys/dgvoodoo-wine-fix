@@ -1,6 +1,6 @@
 # dgVoodoo Wine Fix
 
-Newer dgVoodoo2 versions secretly check for Wine and, if found, corrupt graphics pointers so games crash ([WineHQ bug 58731](https://bugs.winehq.org/show_bug.cgi?id=58731)). This script turns that check off. Your original files are not changed.
+Newer dgVoodoo2 versions secretly check for Wine and, if found, corrupt graphics pointers so games crash ([WineHQ bug 58731](https://bugs.winehq.org/show_bug.cgi?id=58731)). This script turns that check off. Your original files are backed up first, and one command puts them back.
 
 Tested with **dgVoodoo 2.87.5**. On any other version it warns you and asks whether to continue. It may still work on other versions, but YMMV.
 
@@ -14,9 +14,13 @@ Tested with **dgVoodoo 2.87.5**. On any other version it warns you and asks whet
    - Linux: open a terminal in that folder and type `python3 patch_dgvoodoo.py`.
 
    The first time it runs, it automatically downloads [UPX](https://github.com/upx/upx), a free tool it needs to unpack the DLLs. This needs an internet connection; you don't have to install anything yourself.
-5. A new folder called **`patched`** appears. Use the DLLs from it instead of the normal ones. For example, copy `patched/MS/x86/D3D8.dll` into your game's folder.
+5. That's it. The DLLs are fixed in place, and your originals are saved in a new folder called **`original_dlls_backup`**. Copy the fixed DLLs into your game as usual. For example, `MS/x86/D3D8.dll`.
 
 If it says `23 patch site(s) applied. Problems: 0.`, it worked.
+
+**Already copied dgVoodoo into a game?** Fix it there directly: `python3 patch_dgvoodoo.py "/path/to/game"`. It will warn that it can't tell the version; type `y` to continue.
+
+**Something broke?** Undo everything with `python3 patch_dgvoodoo.py --revert` (add the game folder path if you used one).
 
 ## What it changes
 

@@ -15,10 +15,11 @@ downloaded from the official release and checksum-verified). Output DLLs are
 therefore unpacked (larger, same behaviour).
 
 Usage:
-  python3 patch_dgvoodoo.py                      # patch the folder this script is in
-  python3 patch_dgvoodoo.py <dgVoodoo dir> [<output dir>] [--upx /path/to/upx] [--yes]
-Versions other than 2.87.5 ask for confirmation first (--yes skips the question).
-Your original files are never modified; results go to <dgVoodoo dir>/patched.
+  python3 patch_dgvoodoo.py                 # patch the DLLs in the folder this script is in
+  python3 patch_dgvoodoo.py <folder>        # patch a dgVoodoo or game folder
+  python3 patch_dgvoodoo.py --revert        # put the original DLLs back
+Options: --upx /path/to/upx, --yes (don't ask on untested versions).
+DLLs are patched in place; originals are first copied to <folder>/original_dlls_backup.
 """
 import argparse, hashlib, os, shutil, struct, subprocess, sys, tempfile
 
@@ -149,37 +150,74 @@ def find_upx(here):
     os.chmod(path, 0o755)
     return path
 
+BACKUP_DIR = 'original_dlls_backup'
+
+def already_patched(d):
+    """True if every copy of the check in d is in its patched form."""
+    x86 = [i for i in iter_find(d, X86_SIG)]
+    a64 = [i for i in iter_find(d, A64_POOL)]
+    if not x86 and not a64: return False
+    return (all(d[i + len(X86_SIG)] == 0 for i in x86) and
+            all(d.rfind(A64_RET1, max(0, i - 0x20), i) < 0 for i in a64))
+
+def iter_find(d, pat):
+    i = d.find(pat)
+    while i >= 0:
+        yield i; i = d.find(pat, i + 1)
+
+def replace_file(path, data):
+    tmp = path + '.tmp'
+    open(tmp, 'wb').write(data)
+    os.replace(tmp, path)
+
 def main():
     here = os.path.dirname(os.path.abspath(__file__))
     ap = argparse.ArgumentParser()
-    ap.add_argument('src', nargs='?', help='dgVoodoo folder (default: folder this script is in)')
-    ap.add_argument('out', nargs='?', help='output folder (default: <src>/patched)')
+    ap.add_argument('folder', nargs='?', help='dgVoodoo or game folder (default: folder this script is in)')
+    ap.add_argument('--revert', action='store_true', help=f'put the original DLLs back from {BACKUP_DIR}/')
     ap.add_argument('--upx', help='path to upx (default: find or download it)')
     ap.add_argument('--yes', action='store_true', help='do not ask for confirmation on untested versions')
     a = ap.parse_args()
-    interactive = a.src is None
-    a.src = os.path.abspath(a.src or here)
-    a.out = os.path.abspath(a.out or os.path.join(a.src, 'patched'))
-    if a.src == a.out:
-        sys.exit('output dir must differ from input dir')
+    interactive = a.folder is None
+    a.src = os.path.abspath(a.folder or here)
+    a.backup = os.path.join(a.src, BACKUP_DIR)
     try:
-        run(a, here)
+        revert(a) if a.revert else run(a, here)
     finally:
         if interactive and sys.platform.startswith('win'):
             input('\nPress Enter to close...')
+
+def revert(a):
+    if not os.path.isdir(a.backup):
+        print(f'Nothing to revert: no {BACKUP_DIR} folder in {a.src}'); return
+    n = 0; failed = 0
+    for root, _, files in os.walk(a.backup):
+        for f in files:
+            b = os.path.join(root, f); rel = os.path.relpath(b, a.backup)
+            try:
+                replace_file(os.path.join(a.src, rel), open(b, 'rb').read())
+                print(f'restored  {rel}'); n += 1
+            except OSError as e:
+                print(f'ERROR     {rel}: {e}'); failed += 1
+    if failed:
+        print(f'\n{n} restored, {failed} failed (is a game still running?). Backup kept in {a.backup}')
+    else:
+        shutil.rmtree(a.backup)
+        print(f'\n{n} original DLL(s) restored. Backup folder removed.')
 
 def run(a, here):
     if not confirm_version(a.src, a.yes):
         print('Cancelled. Nothing was changed.')
         return
     a.upx = a.upx or find_upx(here)
-    total = 0; problems = 0
+    total = 0; problems = 0; done_before = 0
     for root, dirs, files in os.walk(a.src):
-        dirs[:] = [x for x in dirs if os.path.join(root, x) != a.out and not x.startswith('upx-')]
+        dirs[:] = [x for x in dirs if os.path.join(root, x) != a.backup and not x.startswith('upx-')]
         for f in sorted(files):
             if not f.lower().endswith('.dll'): continue
             p = os.path.join(root, f); rel = os.path.relpath(p, a.src)
-            d = bytearray(open(p, 'rb').read())
+            orig = open(p, 'rb').read()
+            d = bytearray(orig)
             packed = is_wiped_upx(d)
             if packed:  # code is compressed; unpack before searching
                 try: d = unpack(d, a.upx)
@@ -187,19 +225,27 @@ def run(a, here):
                     print(f'ERROR  {rel}: {e}'); problems += 1; continue
             if WINE_CMP2 not in d:
                 print(f'skip   {rel}: no Wine check present'); continue
+            if not packed and already_patched(d):
+                print(f'ok     {rel}: already patched'); done_before += 1; continue
             changes = patch(d)
             if not changes:
                 print(f'WARN   {rel}: Wine check found but no known patch site'); problems += 1; continue
-            dst = os.path.join(a.out, rel)
-            os.makedirs(os.path.dirname(dst), exist_ok=True)
-            open(dst, 'wb').write(d)
+            try:
+                bak = os.path.join(a.backup, rel)
+                os.makedirs(os.path.dirname(bak), exist_ok=True)
+                open(bak, 'wb').write(orig)              # back up the unpatched original first
+                replace_file(p, d)
+            except OSError as e:
+                print(f'ERROR  {rel}: {e} (is a game still running?)'); problems += 1; continue
             total += len(changes)
             desc = ', '.join(f'0x{o:x}: {old:02x}->{new:02x}' for o, old, new in changes)
-            print(f'patch  {rel}{" (unpacked)" if packed else ""}: {desc}  sha256 {sha(d)[:16]}')
-    print(f'\n{total} patch site(s) applied. Problems: {problems}.')
+            print(f'patch  {rel}{" (unpacked)" if packed else ""}: {desc}')
+    print(f'\n{total} patch site(s) applied. Already patched: {done_before}. Problems: {problems}.')
     if total:
-        print(f'Patched DLLs are in: {a.out}')
-    elif not problems:
+        print(f'Originals backed up in: {a.backup}')
+        where = f' "{a.folder}"' if a.folder else ''
+        print(f'To undo: python3 patch_dgvoodoo.py{where} --revert')
+    elif not problems and not done_before:
         print('No dgVoodoo DLLs with the Wine check were found here.')
 
 if __name__ == '__main__':
