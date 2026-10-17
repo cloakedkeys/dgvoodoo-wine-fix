@@ -12,6 +12,8 @@ Tested with **dgVoodoo 2.87.5**. On any other version it warns you and asks whet
 3. **Download [`patch_dgvoodoo.py`](https://raw.githubusercontent.com/cloakedkeys/dgvoodoo-wine-fix/main/patch_dgvoodoo.py)** (right-click the link, then "Save link as…") and save it into the unzipped dgVoodoo folder.
 4. **Run it.**
    - Linux: open a terminal in that folder and type `python3 patch_dgvoodoo.py`.
+
+   The first time it runs, it automatically downloads [UPX](https://github.com/upx/upx), a free tool it needs to unpack the DLLs. This needs an internet connection; you don't have to install anything yourself.
 5. A new folder called **`patched`** appears. Use the DLLs from it instead of the normal ones. For example, copy `patched/MS/x86/D3D8.dll` into your game's folder.
 
 If it says `23 patch site(s) applied. Problems: 0.`, it worked.
