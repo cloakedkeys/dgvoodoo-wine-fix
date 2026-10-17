@@ -7,12 +7,10 @@ Tested with **dgVoodoo 2.87.5**. On any other version it warns you and asks whet
 ## How to use
 
 1. **Get Python 3.**
-   - Windows: install it from [python.org](https://www.python.org/downloads/). During setup, tick **"Add python.exe to PATH"**.
    - Linux: you already have it.
 2. **Get dgVoodoo 2.87.5** from the [official releases page](https://github.com/dege-diosg/dgVoodoo2/releases/tag/v2.87.5) (`dgVoodoo2_87_5.zip`) and unzip it.
 3. **Download [`patch_dgvoodoo.py`](https://raw.githubusercontent.com/cloakedkeys/dgvoodoo-wine-fix/main/patch_dgvoodoo.py)** (right-click the link, then "Save link as…") and save it into the unzipped dgVoodoo folder.
 4. **Run it.**
-   - Windows: double-click `patch_dgvoodoo.py`.
    - Linux: open a terminal in that folder and type `python3 patch_dgvoodoo.py`.
 5. A new folder called **`patched`** appears. Use the DLLs from it instead of the normal ones. For example, copy `patched/MS/x86/D3D8.dll` into your game's folder.
 
