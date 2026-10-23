@@ -9,7 +9,13 @@ Tested with **dgVoodoo 2.87.5**. On any other version it warns you and asks whet
 1. **Get Python 3.**
    - Linux: you already have it.
 2. **Get dgVoodoo 2.87.5** from the [official releases page](https://github.com/dege-diosg/dgVoodoo2/releases/tag/v2.87.5) (`dgVoodoo2_87_5.zip`) and unzip it.
-3. **Download [`patch_dgvoodoo.py`](https://raw.githubusercontent.com/cloakedkeys/dgvoodoo-wine-fix/main/patch_dgvoodoo.py)** (right-click the link, then "Save link as…") and save it into the unzipped dgVoodoo folder.
+3. **Download `patch_dgvoodoo.py` into the unzipped dgVoodoo folder.** Open a terminal in that folder and run:
+
+   ```sh
+   curl -LO https://raw.githubusercontent.com/cloakedkeys/dgvoodoo-wine-fix/main/patch_dgvoodoo.py
+   ```
+
+   Or right-click [this link](https://raw.githubusercontent.com/cloakedkeys/dgvoodoo-wine-fix/main/patch_dgvoodoo.py) and choose "Save link as…". Don't save the script's GitHub page (the one with the code view and buttons): that saves a web page, not the script.
 4. **Run it.**
    - Linux: open a terminal in that folder and type `python3 patch_dgvoodoo.py`.
 
@@ -19,6 +25,8 @@ Tested with **dgVoodoo 2.87.5**. On any other version it warns you and asks whet
 If it says `23 patch site(s) applied. Problems: 0.`, it worked.
 
 **Already copied dgVoodoo into a game?** Fix it there directly: `python3 patch_dgvoodoo.py "/path/to/game"`. It will warn that it can't tell the version; type `y` to continue.
+
+**`SyntaxError: invalid character '·' (U+00B7)`?** You saved the GitHub web page instead of the script. Download it again with the `curl` command in step 3.
 
 **Something broke?** Undo everything with `python3 patch_dgvoodoo.py --revert` (add the game folder path if you used one).
 
