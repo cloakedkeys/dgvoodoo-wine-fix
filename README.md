@@ -6,8 +6,11 @@ Tested with **dgVoodoo 2.87.5 and 2.87.6**. On any other version it warns you an
 
 ## How to use
 
-1. **Get Python 3.**
-   - Linux: you already have it.
+1. **Get Python 3 and Capstone.** Install the instruction decoder once:
+
+   ```sh
+   python3 -m pip install capstone==5.0.7
+   ```
 2. **Get dgVoodoo 2.87.6** from the [official releases page](https://github.com/dege-diosg/dgVoodoo2/releases/tag/2.87.6) (`dgVoodoo2_87_6.zip`) and unzip it.
 3. **Download `patch_dgvoodoo.py` into the unzipped dgVoodoo folder.** Open a terminal in that folder and run:
 
@@ -35,3 +38,26 @@ If it says `23 patch site(s) applied. Problems: 0.`, it worked.
 It changes one byte in each copy of the hidden Wine check (23 copies across 22 DLLs), so the check always answers "not Wine". Nothing else is touched.
 
 The x86/x64 DLLs are compressed with UPX, so the script unpacks them first. This makes the patched files bigger, but they behave the same. If UPX isn't installed, the script downloads the official UPX 4.2.4 release and checks its checksum first.
+
+The detector disassembles executable PE sections and follows references to the
+Wine predicate. It reconstructs the scrambled `NTDLL.DLL` initializer, adds the
+UTF-16 keys to recover the name, validates the PE export-name walk, and decodes
+the two keyed comparisons to `wine_get`. It checks the sliding-window reads,
+branches, and return paths before choosing a patch byte. All analysis is static;
+the DLLs are never loaded or executed.
+
+Keys, comparison constants, image bases, file offsets, and the distance between
+the export walker and predicate are not fixed. x86, x64, ARM64, CHPE x86, and both
+ARM64X copies are covered. This is a bounded decoder for the observed algorithm,
+not a general decompiler: a different algorithm, instruction form, or compiler
+layout can still be unrecognized. Unrecognized forms are left untouched; keep
+the version warning and test an unfamiliar release before using it.
+
+## Tests
+
+Run `python3 -m unittest discover -s tests -v`. To include real-release regression
+tests, set `DGVOODOO_RELEASES` to unpacked release directories separated by your
+platform's path separator (`:` on Linux, `;` on Windows). Each directory should
+contain the full 24-DLL release tree after UPX decompression. These optional tests
+also re-key the Wine comparisons and move the sections in the file. No proprietary
+DLLs are included in this repository.
