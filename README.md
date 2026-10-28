@@ -2,13 +2,13 @@
 
 Newer dgVoodoo2 versions secretly check for Wine and, if found, corrupt graphics pointers so games crash ([WineHQ bug 58731](https://bugs.winehq.org/show_bug.cgi?id=58731)). This script turns that check off. Your original files are backed up first, and one command puts them back.
 
-Tested with **dgVoodoo 2.87.5**. On any other version it warns you and asks whether to continue. It may still work on other versions, but YMMV.
+Tested with **dgVoodoo 2.87.5 and 2.87.6**. On any other version it warns you and asks whether to continue. It may still work on other versions, but YMMV.
 
 ## How to use
 
 1. **Get Python 3.**
    - Linux: you already have it.
-2. **Get dgVoodoo 2.87.5** from the [official releases page](https://github.com/dege-diosg/dgVoodoo2/releases/tag/v2.87.5) (`dgVoodoo2_87_5.zip`) and unzip it.
+2. **Get dgVoodoo 2.87.6** from the [official releases page](https://github.com/dege-diosg/dgVoodoo2/releases/tag/2.87.6) (`dgVoodoo2_87_6.zip`) and unzip it.
 3. **Download `patch_dgvoodoo.py` into the unzipped dgVoodoo folder.** Open a terminal in that folder and run:
 
    ```sh

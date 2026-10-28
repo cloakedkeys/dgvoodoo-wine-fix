@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Disable dgVoodoo2's hidden Wine detection (verified on 2.87.5) so the DLLs take
+Disable dgVoodoo2's hidden Wine detection (verified on 2.87.5 and 2.87.6) so the DLLs take
 the same code path under Wine as they do on Windows.
 
 What it changes: in each copy of the obfuscated "ntdll exports wine_get*"
@@ -49,12 +49,58 @@ def is_wiped_upx(d):
     return (len(secs) >= 3 and secs[0][1] == b'\0' * 8 and secs[1][1] == b'\0' * 8
             and secs[0][3] == 0 and d[0x3e0:0x3e4] == b'\0\0\0\0' and d[0x3e4] in (0x0d, 0x0e))
 
+def nrv2e_len(src):
+    """Length of the output of a UPX NRV2E (LE32) stream. Only counts, does not copy."""
+    ip = bb = bc = olen = 0; last = 1
+    def bit():
+        nonlocal ip, bb, bc
+        if bc == 0:
+            bb = struct.unpack_from('<I', src, ip)[0]; ip += 4; bc = 32
+        bc -= 1
+        return (bb >> bc) & 1
+    while True:
+        while bit(): ip += 1; olen += 1
+        off = 1
+        while True:
+            off = off * 2 + bit()
+            if bit(): break
+            off = (off - 1) * 2 + bit()
+        if off == 2:
+            off = last; n = bit()
+        else:
+            off = ((off - 3) * 256 + src[ip]) & 0xffffffff; ip += 1
+            if off == 0xffffffff: return olen
+            n = (off ^ 1) & 1; off = (off >> 1) + 1; last = off
+        if n: n = 1 + bit()
+        elif bit(): n = 3 + bit()
+        else:
+            n = 1
+            while True:
+                n = n * 2 + bit()
+                if bit(): break
+            n += 3
+        olen += n + 1 + (off > 0x500)
+
+def fix_upx_header(d, c_off):
+    """Since 2.87.6 the uncompressed-size field (u_len) of the UPX header is also
+    scrambled. Recover it by walking the compressed stream; the header's own
+    checksum confirms the result."""
+    h = 0x3e0
+    if sum(d[h + 4:h + 31]) % 251 == d[h + 31]: return
+    method, c_len = d[h + 6], struct.unpack_from('<I', d, h + 20)[0]
+    if method != 8:
+        raise RuntimeError(f'UPX header damaged and compression method {method} is not supported')
+    struct.pack_into('<I', d, h + 16, nrv2e_len(bytes(d[c_off:c_off + c_len])))
+    if sum(d[h + 4:h + 31]) % 251 != d[h + 31]:
+        raise RuntimeError('UPX header damaged and could not be repaired')
+
 def unpack(d, upx):
     d = bytearray(d)
     _, secs = pe_info(d)
     d[secs[0][0]:secs[0][0] + 8] = b'UPX0\0\0\0\0'
     d[secs[1][0]:secs[1][0] + 8] = b'UPX1\0\0\0\0'
     d[0x3e0:0x3e4] = b'UPX!'
+    fix_upx_header(d, secs[1][4])
     with tempfile.TemporaryDirectory() as t:
         src, dst = os.path.join(t, 'in.dll'), os.path.join(t, 'out.dll')
         open(src, 'wb').write(d)
@@ -82,7 +128,7 @@ def patch(d):
         i = d.find(A64_POOL, i + 1)
     return done
 
-TESTED_VERSIONS = {'2.8.7.5'}   # dgVoodooCpl.exe FileVersion of releases this was verified on
+TESTED_VERSIONS = {'2.8.7.5', '2.8.7.6'}   # dgVoodooCpl.exe FileVersion of releases this was verified on
 
 def dgvoodoo_version(src):
     """FileVersion of dgVoodooCpl.exe (from its VS_FIXEDFILEINFO), or None."""
@@ -104,7 +150,7 @@ def confirm_version(src, assume_yes):
         return True
     print('WARNING: ' + (f'dgVoodoo version {v} has not been tested with this patcher.' if v
                          else 'Could not determine the dgVoodoo version (dgVoodooCpl.exe not found).'))
-    print('The patch looks for the exact code pattern found in 2.87.5. On other versions it may\n'
+    print('The patch looks for the exact code pattern found in 2.87.5 and 2.87.6. On other versions it may\n'
           'find nothing, or (unlikely) change the wrong byte. Your originals are not modified\n'
           'either way, but test the patched DLLs before relying on them.')
     if assume_yes:
